@@ -11,7 +11,7 @@ set -euo pipefail
 
 RECIPIENT="${RECIPIENT:?set RECIPIENT (email address)}"
 SUBJECT="${SUBJECT:-Pipeline OK}"
-BODY="${BODY:-It's all good - all jobs finished successfully.}"
+BODY="${BODY:-All good - all jobs finished successfully.}"
 
 if command -v mail >/dev/null 2>&1; then
   printf '%s\n' "$BODY" | mail -s "$SUBJECT" "$RECIPIENT"
