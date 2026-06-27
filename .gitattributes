@@ -1,0 +1,3 @@
+# scripts run on a Linux Jenkins agent — force LF so bash/python never see CRLF
+*.sh  text eol=lf
+*.py  text eol=lf

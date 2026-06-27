@@ -1,0 +1,3 @@
+# keep repo clean: ignore every markdown file except README
+*.md
+!README.md
