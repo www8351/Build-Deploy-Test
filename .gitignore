@@ -1,3 +1,7 @@
 # keep repo clean: ignore every markdown file except README
 *.md
 !README.md
+
+# python build artifacts
+__pycache__/
+*.pyc
