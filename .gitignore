@@ -10,6 +10,11 @@ __pycache__/
 .venv/
 uv.lock
 
+# test / coverage artifacts
+.coverage
+coverage.xml
+.pytest_cache/
+
 # OpenTofu / Terraform (keep .tf and .terraform.lock.hcl; ignore state + provider cache)
 infra/.terraform/
 *.tfstate

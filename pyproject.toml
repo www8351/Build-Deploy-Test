@@ -43,6 +43,9 @@ addopts = "-q"
 [tool.coverage.run]
 source = ["jobs"]
 omit = ["jobs/*.sh"]
+# Record relative paths so the coverage data is portable into the
+# python-coverage-comment-action container (else it errors "No source for code").
+relative_files = true
 
 [tool.coverage.report]
 show_missing = true

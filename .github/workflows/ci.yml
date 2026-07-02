@@ -87,11 +87,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up bats + libraries
+      - name: Set up bats
         uses: bats-core/bats-action@3.0.0
         with:
-          support-install: true
-          assert-install: true
+          support-install: false
+          assert-install: false
           detik-install: false
           file-install: false
 
