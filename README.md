@@ -211,13 +211,30 @@ State files and the `.terraform/` provider cache are gitignored; `.terraform.loc
 committed for reproducible provider versions.
 
 ### Cilium — eBPF network policy (`k8s/cilium/`)
-The k8s/eBPF layer-3/4 twin of `job10`'s firewall. `00-default-deny.yaml` flips the `web`
-namespace to default-deny; `10-allow-web.yaml` re-opens only TCP `8351` from `world` and DNS
-egress (with L7 DNS visibility). Apply on a Cilium-CNI cluster:
+The k8s/eBPF twin of `job10`'s firewall, zero-trust at **both** container and host level:
+`00-default-deny.yaml` flips the `web` namespace to default-deny; `10-allow-web.yaml` re-opens
+only TCP `8351` and DNS egress; `20-host-firewall.yaml` is a **clusterwide Host Firewall** that
+default-denies the nodes themselves, permitting only cluster-essential traffic + mgmt SSH from
+a restricted CIDR (not `0.0.0.0/0`).
+
+Establish the eBPF datapath with Host Firewall + kube-proxy replacement, then apply:
 
 ```bash
+# eBPF datapath (Host Firewall needs it explicitly enabled + the host devices named)
+cilium install \
+  --set hostFirewall.enabled=true \
+  --set kubeProxyReplacement=true \
+  --set devices='{eth0}'
+cilium status --wait
+
 kubectl apply -f k8s/cilium/
-kubectl -n web get ciliumnetworkpolicy
+kubectl get ciliumclusterwidenetworkpolicy         # host firewall
+kubectl -n web get ciliumnetworkpolicy             # namespace policies
+
+# Stage the host policy safely (audit first — logs would-be drops, enforces nothing):
+kubectl annotate cnp/host-firewall-zero-trust io.cilium.policy-audit-mode=true
+cilium monitor --type policy-verdict               # confirm no essential traffic is dropped
+kubectl annotate cnp/host-firewall-zero-trust io.cilium.policy-audit-mode-   # flip to enforce
 ```
 
 ### Falco — runtime threat detection (`falco/`)

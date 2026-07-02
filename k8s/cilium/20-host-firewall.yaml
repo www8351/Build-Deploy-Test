@@ -1,0 +1,63 @@
+# Cilium Host Firewall - node/host-level zero-trust (eBPF datapath).
+# The host counterpart to job7/job10: 00-default-deny + 10-allow-web lock down the
+# `web` namespace (container level); THIS clusterwide policy locks down the NODES
+# themselves. Once it selects the host endpoint, Cilium default-denies host traffic
+# and only the rules below are permitted.
+#
+# Requires Host Firewall on the datapath (see README "Cilium"):
+#   cilium install --set hostFirewall.enabled=true \
+#     --set kubeProxyReplacement=true --set devices='{eth0}'
+#
+# !! LOCKOUT SAFETY (the dry-run equivalent): a wrong CIDR here can cut SSH to
+#    every node. Roll out in AUDIT mode first — it logs would-be drops WITHOUT
+#    enforcing — then flip to enforce once the logs are clean:
+#      kubectl annotate cnp/host-firewall-zero-trust \
+#        io.cilium.policy-audit-mode=true          # audit (no drops)
+#      # ...verify `cilium monitor --type policy-verdict` shows no essential drops...
+#      kubectl annotate cnp/host-firewall-zero-trust \
+#        io.cilium.policy-audit-mode-             # remove -> enforce
+---
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: host-firewall-zero-trust
+spec:
+  description: "Default-deny host traffic; allow only cluster-essential + mgmt SSH."
+  # Select the host endpoint on every node. Narrow with matchLabels to stage a
+  # rollout node-by-node (e.g. kubernetes.io/hostname or a canary label).
+  nodeSelector:
+    matchLabels: {}
+  ingress:
+    # Cluster plumbing that MUST stay open or the node leaves the cluster:
+    # control-plane, node-to-node (VXLAN/health), and Cilium health probes.
+    - fromEntities:
+        - kube-apiserver
+        - remote-node
+        - health
+        - cluster
+    # Management SSH — RESTRICT to your bastion / mgmt network. This is an
+    # internal RFC1918 placeholder, NOT 0.0.0.0/0. Set your real CIDR.
+    - fromCIDR:
+        - 10.0.0.0/8
+      toPorts:
+        - ports:
+            - port: "22"
+              protocol: TCP
+  egress:
+    - toEntities:
+        - kube-apiserver
+        - remote-node
+        - health
+        - cluster
+    # DNS egress to kube-dns so the node can resolve names under default-deny.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*"
