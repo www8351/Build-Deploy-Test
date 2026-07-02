@@ -2,9 +2,11 @@
 
 [![CI](https://github.com/www8351/build-deploy-test/actions/workflows/ci.yml/badge.svg)](https://github.com/www8351/build-deploy-test/actions/workflows/ci.yml)
 
-A small DevOps lab: two interactive **Labs** and six **Jenkins Jobs** that build, deploy and
-test with Docker — wired together as a Jenkins delivery pipeline. The repo was built **one
-commit per step** so the git history reads as a step-by-step walkthrough.
+A DevOps lab: two interactive **Labs**, six **build/deploy Jobs** (Docker) wired together as a
+Jenkins delivery pipeline, plus a **Security & Cloud backlog** (jobs 7–18) — SSH/firewall
+hardening, CVE + file-integrity scanning, encrypted backups, async health monitoring, and
+AWS/GCP provisioning & IAM audit. The repo was built **one commit per step** so the git
+history reads as a step-by-step walkthrough.
 
 > Scripts target a **Linux Jenkins agent** (they use `useradd`, a package manager and
 > `docker`). Install scripts auto-detect `apt-get`, `dnf` or `yum`, so they run on
@@ -24,8 +26,16 @@ commit per step** so the git history reads as a step-by-step walkthrough.
 │   ├── job3_containers_log.sh# dump container ID/Image/Name/IP -> Log.txt
 │   ├── job4_pull_remote.sh   # pull an image on a remote host over SSH
 │   ├── job5_deploy3_ips.sh   # run 3 containers + print their IPs
-│   └── job6_send_mail.sh     # "all good" mail at end of pipeline
-├── Jenkinsfile               # pipeline-as-code: jobs 1-6 as declarative stages
+│   ├── job6_send_mail.sh     # "all good" mail at end of pipeline
+│   ├── job7_ssh_hardening.sh      # idempotent sshd_config hardening + sshd -t + rollback
+│   ├── job8_trivy_docker_scan.sh  # Trivy CVE scan gate (JSON + SBOM), blocks on threshold
+│   ├── job9_fim_baseline.py       # file-integrity monitor: SHA-256 baseline in SQLite
+│   ├── job10_iptables_lockdown.sh # default-DROP firewall via atomic iptables-restore
+│   ├── job11_api_health_monitor.py# async API probes (aiohttp), Pydantic gate, p50/p95/p99
+│   ├── job13_pg_dump_encrypt.sh   # pg_dump | zstd | gpg streamed encrypted backup
+│   ├── job15_aws_ec2_provision.sh # AWS EC2 provision, IMDSv2-required, least-open SG
+│   └── job18_gcp_iam_least_priv.py# GCP IAM audit: flag owner/editor, Markdown report
+├── Jenkinsfile               # pipeline-as-code: jobs 1-6 stages + opt-in security group
 ├── .gitattributes            # force LF on scripts (Linux agent)
 └── .gitignore                # only README.md is tracked among *.md
 ```
@@ -49,6 +59,17 @@ HOST_PORT=8351               ./jobs/job2_docker_nginx.sh
 REMOTE_HOST=10.0.0.5 IMAGE=nginx ./jobs/job4_pull_remote.sh
 COUNT=3 IMAGE=nginx          ./jobs/job5_deploy3_ips.sh
 RECIPIENT=you@example.com    ./jobs/job6_send_mail.sh
+
+# Security & cloud jobs (7-18) — most are destructive or need creds; read the header first
+sudo MAX_AUTH_TRIES=3        ./jobs/job7_ssh_hardening.sh          # edits sshd_config, validates, rolls back on fail
+IMAGE=nginx THRESHOLD=0      ./jobs/job8_trivy_docker_scan.sh      # non-zero exit if HIGH/CRITICAL CVEs found
+sudo ./jobs/job9_fim_baseline.py                                  # build baseline;  add --verify to diff
+sudo ./jobs/job9_fim_baseline.py --verify
+sudo DRY_RUN=true APP_PORT=8351 ./jobs/job10_iptables_lockdown.sh # render rules; DRY_RUN=false to apply
+./jobs/job11_api_health_monitor.py --url https://example.com --count 20
+GPG_RECIPIENT=you@example.com PGDATABASE=app ./jobs/job13_pg_dump_encrypt.sh
+DRY_RUN=true ./jobs/job15_aws_ec2_provision.sh                    # needs aws-cli v2 + creds
+./jobs/job18_gcp_iam_least_priv.py --project my-gcp-project       # needs ADC / workload identity
 ```
 
 ## The Labs
@@ -72,6 +93,28 @@ RECIPIENT=you@example.com    ./jobs/job6_send_mail.sh
 | 4 | `job4_pull_remote.sh` | `ssh` to a remote host and `docker pull` an image | `REMOTE_HOST`, `REMOTE_USER`, `IMAGE` |
 | 5 | `job5_deploy3_ips.sh` | deploy 3 containers, print their IPs | `COUNT`, `IMAGE` |
 | 6 | `job6_send_mail.sh` | send an "all good" mail | `RECIPIENT`, `SUBJECT`, `BODY` |
+
+## Security & Cloud jobs (7–18)
+
+Hardening, scanning and cloud-provisioning steps added as an isolated backlog. Each is
+standalone (not part of the 1→6 build flow) and self-contained: `set -Eeuo pipefail` /
+custom exceptions, idempotent where it edits state, dry-run or rollback on the destructive
+ones, structured (JSON / Markdown) output, and a **non-zero exit that gates a pipeline**.
+
+| Job | Script | What it does | Key params / flags | Exit gate |
+|-----|--------|--------------|--------------------|-----------|
+| 7 | `job7_ssh_hardening.sh` | idempotent `sshd_config` hardening (`sed set_directive`), timestamped backup, `sshd -t` validate before reload, **trap auto-restores** on failure | `MAX_AUTH_TRIES`, `KEX`, `BACKUP` | fails if `sshd -t` rejects |
+| 8 | `job8_trivy_docker_scan.sh` | Trivy CVE scan (local bin or `aquasec/trivy` container) → JSON report (+ optional SBOM), counts HIGH/CRITICAL | `IMAGE`, `SEVERITY`, `THRESHOLD`, `REPORT`, `SBOM_FILE`/`SBOM_FORMAT` | exit ≠0 if findings > `THRESHOLD` |
+| 9 | `job9_fim_baseline.py` | file-integrity monitor: SHA-256 over `/etc`, `/var/spool/cron`, `/root/.ssh` → SQLite baseline; `--verify` diffs + JSON→syslog | `--verify`, `--paths`, `--db` | 0 clean / 1 drift / 2 error |
+| 10 | `job10_iptables_lockdown.sh` | default-DROP INPUT/FWD/OUTPUT, allow lo + established + SSH/APP ports, rate-limited drop-LOG, atomic `iptables-restore` | `APP_PORT`, `SSH_PORT`, `DRY_RUN` | applies only when `DRY_RUN=false` |
+| 11 | `job11_api_health_monitor.py` | concurrent async probes (aiohttp/asyncio), Pydantic v2 schema gate, p50/p95/p99 latency | `--url`/`--urls-file`, `--count`, `--concurrency`, `--timeout` | exit 1 if any endpoint unhealthy |
+| 13 | `job13_pg_dump_encrypt.sh` | `pg_dump \| zstd \| gpg` **streamed** (no plaintext on disk), optional isolated temp keyring shredded on exit | `PGDATABASE`, `GPG_RECIPIENT`/`RECIPIENT_KEY_FILE`, `OUT_DIR`, `DRY_RUN` | fails on any pipe error |
+| 15 | `job15_aws_ec2_provision.sh` | aws-cli v2 + JMESPath: least-open SG, **IMDSv2 required**, base64 user-data (docker + cloudwatch + ssh lockdown) | `AWS_REGION`, `AMI_ID`, `INSTANCE_TYPE`, `APP_PORT`, `DRY_RUN` | fails fast on missing creds |
+| 18 | `job18_gcp_iam_least_priv.py` | GCP IAM audit: flag `roles/owner`\|`editor` bindings, append Markdown table | `--project` (or `--bindings-file` offline) | exit 1 on violations / 2 on error |
+
+> ⚠️ Jobs 7 and 10 change system state (sshd, firewall). Job 10 defaults to **dry-run**;
+> job 7 validates and **auto-rolls-back**. Cloud jobs 15/18 need real credentials
+> (AWS creds / GCP ADC). Read each script's header block before running for real.
 
 ## Jenkins setup
 
@@ -123,6 +166,11 @@ pipeline. Set it up once:
    `RECIPIENT` are left empty, so the pipeline runs green out-of-the-box on a single agent.
    A *Preflight* stage wipes stale artifacts and fails fast if the agent lacks docker or
    passwordless sudo. `Log.txt` and `zipfile.tgz` are archived on every run.
+
+   Security jobs 7–18 are wired in as an **opt-in `Security & Compliance` stage group,
+   all default-skipped**. Enable a job with its boolean parameter; the destructive ones
+   (job 7 sshd, job 10 iptables) are guarded default-false, and job 10 defaults to
+   `IPTABLES_DRY_RUN=true`. Preflight also wipes their scan/report artifacts.
 
 ### 4b. Alternative: chained freestyle jobs (the classic way)
 
