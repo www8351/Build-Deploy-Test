@@ -64,6 +64,7 @@ command -v iptables-restore >/dev/null 2>&1 || {
   exit 1
 }
 
-# pipe (not `sudo ... < file`) so the redirect isn't done by the unprivileged shell.
-cat "$RULES_FILE" | sudo iptables-restore
+# pass the file as an argument (no redirect, no cat) so it works under sudo and
+# stays lint-clean.
+sudo iptables-restore "$RULES_FILE"
 echo "Done: firewall locked down (SSH ${SSH_PORT}, app ${APP_PORT} open; default DROP)."
