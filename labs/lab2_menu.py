@@ -47,9 +47,13 @@ def install_java() -> None:
         return
     pkg = "default-jdk" if pm == "apt-get" else "java-latest-openjdk"
     print(f"Using {pm} to install {pkg} ...")
+    # Trusted: fixed literal argv, shell=False, no user input reaches the command.
+    # `pm` is allowlisted by detect_pm() to {apt-get,dnf,yum}; `pkg` is a literal.
+    # sudo/apt-get resolved by name is intentional (sudo enforces secure_path;
+    # absolute paths differ across distros).
     if pm == "apt-get":
-        subprocess.run(["sudo", "apt-get", "update", "-y"], check=False)
-    subprocess.run(["sudo", pm, "install", "-y", pkg], check=False)
+        subprocess.run(["sudo", "apt-get", "update", "-y"], check=False)  # noqa: S603, S607
+    subprocess.run(["sudo", pm, "install", "-y", pkg], check=False)  # noqa: S603, S607
     print("Java install attempted. Verify with: java -version")
 
 
