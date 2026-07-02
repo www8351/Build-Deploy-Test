@@ -6,16 +6,20 @@
 set -euo pipefail
 
 HOST_PORT="${HOST_PORT:-8351}"
+NAME="job2_nginx"
 
 sudo docker pull nginx
 
+# Idempotent rerun: remove a previous instance so the port is free.
+sudo docker rm -f "$NAME" >/dev/null 2>&1 || true
+
 # Run detached; container port 80 published to host $HOST_PORT.
-cid="$(sudo docker run -d -p "${HOST_PORT}:80" nginx)"
+cid="$(sudo docker run -d --name "$NAME" -p "${HOST_PORT}:80" nginx)"
 echo "Started container: $cid"
 
 # Give nginx a moment, then hit it via the host port.
 sleep 2
 echo "--- curl http://localhost:${HOST_PORT} ---"
-sudo curl -s "http://localhost:${HOST_PORT}" | head -n 5
+curl -s "http://localhost:${HOST_PORT}" | head -n 5
 
 echo "Done."
