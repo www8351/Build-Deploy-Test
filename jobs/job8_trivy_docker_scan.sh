@@ -2,13 +2,17 @@
 #
 # JOB 8 - scan a container image for CVEs with Trivy and gate deployment.
 # Jenkins: "Execute shell" build step. Runs on a Linux agent.
-#   IMAGE     - image to scan                 (default: nginx)
-#   SEVERITY  - severities to report          (default: HIGH,CRITICAL)
-#   THRESHOLD - max vulns allowed before fail (default: 0)
-#   REPORT    - JSON report path (CWD)         (default: trivy_report.json)
+#   IMAGE       - image to scan                 (default: nginx)
+#   SEVERITY    - severities to report          (default: HIGH,CRITICAL)
+#   THRESHOLD   - max vulns allowed before fail (default: 0)
+#   REPORT      - JSON report path (CWD)         (default: trivy_report.json)
+#   SBOM_FORMAT - cyclonedx | spdx-json | spdx | none (default: cyclonedx)
+#   SBOM_FILE   - SBOM output path (CWD)         (default: sbom.cdx.json)
 #
-# Writes a structured JSON report and exits non-zero when the count of matching
-# vulnerabilities exceeds THRESHOLD, so a downstream deploy stage is blocked.
+# Writes a structured JSON report AND a Software Bill of Materials (SBOM), then
+# exits non-zero when the count of matching vulnerabilities exceeds THRESHOLD,
+# so a downstream deploy stage is blocked. The SBOM is generated before the gate
+# so it is produced as evidence even for an image that fails the scan.
 # Uses a local `trivy` binary if present, otherwise the aquasec/trivy container.
 #
 set -Eeuo pipefail
@@ -17,14 +21,17 @@ IMAGE="${IMAGE:-nginx}"
 SEVERITY="${SEVERITY:-HIGH,CRITICAL}"
 THRESHOLD="${THRESHOLD:-0}"
 REPORT="${REPORT:-trivy_report.json}"
+SBOM_FORMAT="${SBOM_FORMAT:-cyclonedx}"
+SBOM_FILE="${SBOM_FILE:-sbom.cdx.json}"
 TRIVY_IMAGE_TAG="${TRIVY_IMAGE_TAG:-aquasec/trivy:latest}"
 
-# Drop a partial/empty report if we bailed before Trivy finished writing it.
-# A threshold-exceed exit keeps its (non-empty) report on purpose.
+# Drop a partial/empty report or SBOM if we bailed before Trivy finished writing.
+# A threshold-exceed exit keeps its (non-empty) files on purpose.
 cleanup() {
   local rc=$?
-  if [ "$rc" -ne 0 ] && [ -f "$REPORT" ] && [ ! -s "$REPORT" ]; then
-    rm -f -- "$REPORT"
+  if [ "$rc" -ne 0 ]; then
+    [ -f "$REPORT" ] && [ ! -s "$REPORT" ] && rm -f -- "$REPORT"
+    [ -f "$SBOM_FILE" ] && [ ! -s "$SBOM_FILE" ] && rm -f -- "$SBOM_FILE"
   fi
   exit "$rc"
 }
@@ -64,6 +71,13 @@ fi
 echo "--- trivy scan: $IMAGE (severity $SEVERITY) ---"
 run_trivy image --severity "$SEVERITY" --format json --quiet "$IMAGE" > "$REPORT"
 echo "Report: $(pwd)/$REPORT"
+
+# SBOM as deployment evidence (before the gate, so it exists even on a fail).
+if [ "$SBOM_FORMAT" != "none" ]; then
+  echo "--- SBOM: $SBOM_FORMAT ---"
+  run_trivy image --format "$SBOM_FORMAT" --quiet "$IMAGE" > "$SBOM_FILE"
+  echo "SBOM: $(pwd)/$SBOM_FILE"
+fi
 
 count="$(count_vulns "$REPORT")"
 

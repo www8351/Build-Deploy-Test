@@ -38,6 +38,7 @@ pipeline {
         booleanParam(name: 'RUN_SSH_HARDENING', defaultValue: false, description: 'Job 7 - HARDEN THIS AGENT sshd (applies immediately, no dry run)')
         string(name: 'TRIVY_IMAGE',  defaultValue: '',    description: 'Job 8 - image to CVE-scan (empty = skip)')
         string(name: 'TRIVY_THRESHOLD', defaultValue: '0', description: 'Job 8 - max HIGH/CRITICAL vulns before failing the build')
+        string(name: 'SBOM_FORMAT',  defaultValue: 'cyclonedx', description: 'Job 8 - SBOM format: cyclonedx | spdx-json | spdx | none')
         booleanParam(name: 'RUN_FIM', defaultValue: false, description: 'Job 9 - build FIM SHA-256 baseline of /etc,/var/spool/cron,/root/.ssh')
         booleanParam(name: 'RUN_IPTABLES', defaultValue: false, description: 'Job 10 - firewall lockdown on THIS AGENT')
         booleanParam(name: 'IPTABLES_DRY_RUN', defaultValue: true, description: 'Job 10 - only print the ruleset, do NOT apply (keep true unless you mean it)')
@@ -53,7 +54,7 @@ pipeline {
                 // Wipe outputs from a previous build so archived artifacts are
                 // always from this run, and fail fast on an unfit agent.
                 sh '''
-                    rm -f Log.txt zipfile.tgz trivy_report.json fim_baseline.db iam_audit.md
+                    rm -f Log.txt zipfile.tgz trivy_report.json sbom.cdx.json fim_baseline.db iam_audit.md
                     command -v docker >/dev/null || { echo "Agent lacks docker" >&2; exit 1; }
                     sudo -n true 2>/dev/null   || { echo "Agent lacks passwordless sudo" >&2; exit 1; }
                 '''
@@ -93,8 +94,9 @@ pipeline {
                     // remap: job8 reads $IMAGE, but $IMAGE is the delivery param
                     // (nginx). Scan the operator-chosen TRIVY_IMAGE instead.
                     environment {
-                        IMAGE     = "${params.TRIVY_IMAGE}"
-                        THRESHOLD = "${params.TRIVY_THRESHOLD}"
+                        IMAGE       = "${params.TRIVY_IMAGE}"
+                        THRESHOLD   = "${params.TRIVY_THRESHOLD}"
+                        SBOM_FORMAT = "${params.SBOM_FORMAT}"
                     }
                     steps { sh 'bash jobs/job8_trivy_docker_scan.sh' }
                 }
@@ -143,7 +145,7 @@ pipeline {
             echo 'Pipeline failed - check the first red stage above.'
         }
         always {
-            archiveArtifacts artifacts: 'Log.txt, zipfile.tgz, trivy_report.json, fim_baseline.db, iam_audit.md',
+            archiveArtifacts artifacts: 'Log.txt, zipfile.tgz, trivy_report.json, sbom.cdx.json, fim_baseline.db, iam_audit.md',
                              allowEmptyArchive: true
         }
     }
