@@ -1,0 +1,72 @@
+# Falco runtime configuration for a hardened Linux host.
+# Pairs with falco_rules.local.yaml. Two design constraints drive this file:
+#   1. Kernel safety  - use the modern eBPF (CO-RE) driver: no out-of-tree kernel
+#      module is compiled or loaded, so Falco cannot destabilize the kernel.
+#   2. Data sovereignty - threat events go ONLY to localized sinks (a root-owned
+#      JSON log file + local syslog). Every network/external output is disabled.
+#
+# Validate rules:  falco --validate falco/falco_rules.local.yaml
+# Run:             falco -c falco/falco.yaml
+---
+# Rules to load (the repo's self-contained ruleset). On a host, mount it under
+# /etc/falco/rules.d/ or point this at the mounted path.
+rules_files:
+  - falco/falco_rules.local.yaml
+
+# --- driver: modern eBPF, no kernel module -----------------------------------
+engine:
+  kind: modern_ebpf
+  modern_ebpf:
+    cpus_for_each_buffer: 2
+    buf_size_preset: 4
+    drop_failed_exit: true      # drop failed syscall exits early: less overhead
+
+# Only surface NOTICE and above (rules use NOTICE/WARNING).
+priority: notice
+# Never buffer security events — flush immediately to the sinks.
+buffered_outputs: false
+
+# --- localized sinks ONLY ----------------------------------------------------
+# Machine-readable events for a log aggregator / audit pipeline you control.
+json_output: true
+json_include_output_property: true
+json_include_tags_property: true
+
+# Console (captured by the container/systemd journal).
+stdout_output:
+  enabled: true
+
+# Primary audit sink: a root-owned append log on the local host. Create it with
+# strict perms out of band:  install -o root -g root -m 0600 /dev/null \
+#   /var/log/falco/events.log
+file_output:
+  enabled: true
+  keep_alive: false
+  filename: /var/log/falco/events.log
+
+# Local syslog (forward to your internal SIEM via the host's own rsyslog if wanted).
+syslog_output:
+  enabled: true
+
+# --- external outputs: DISABLED (data-sovereignty) ---------------------------
+# No event data leaves the host through Falco itself.
+http_output:
+  enabled: false
+grpc:
+  enabled: false
+grpc_output:
+  enabled: false
+program_output:
+  enabled: false
+# Embedded webserver is only needed for k8s-audit webhooks; off by default here,
+# and bound to loopback if ever enabled.
+webserver:
+  enabled: false
+  listen_address: 127.0.0.1
+
+# --- Falco's own operational logs --------------------------------------------
+log_stderr: true
+log_syslog: true
+log_level: info
+libs_logger:
+  enabled: false

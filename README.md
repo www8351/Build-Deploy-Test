@@ -240,11 +240,20 @@ kubectl annotate cnp/host-firewall-zero-trust io.cilium.policy-audit-mode-   # f
 ### Falco — runtime threat detection (`falco/`)
 `falco_rules.local.yaml` adds self-contained rules — sensitive-file reads
 (`/etc/shadow`, authorized_keys), a shell spawned inside a container, and writes under `/etc`
-— complementing the `job9` file-integrity baseline at runtime:
+— complementing the `job9` file-integrity baseline at runtime. `falco.yaml` is the runtime
+config, built around two constraints:
+
+- **Kernel safety** — the `modern_ebpf` (CO-RE) driver: no out-of-tree kernel module is
+  compiled or loaded, so Falco cannot destabilize the kernel.
+- **Data sovereignty** — events go **only** to localized sinks (a root-owned JSON log at
+  `/var/log/falco/events.log` + local syslog). Every external output — `http_output`, `grpc`,
+  `program_output`, the k8s-audit `webserver` — is explicitly **disabled**, so no threat data
+  leaves the host through Falco.
 
 ```bash
 falco --validate falco/falco_rules.local.yaml     # rules are syntax-checked in CI-style
-falco -r falco/falco_rules.local.yaml             # run against the live host/containers
+install -o root -g root -m 0600 /dev/null /var/log/falco/events.log   # strict audit sink
+falco -c falco/falco.yaml                          # run with the hardened config
 ```
 
 ### SBOM (Job 8)
