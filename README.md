@@ -23,6 +23,7 @@ commit per step** so the git history reads as a step-by-step walkthrough.
 │   ├── job4_pull_remote.sh   # pull an image on a remote host over SSH
 │   ├── job5_deploy3_ips.sh   # run 3 containers + print their IPs
 │   └── job6_send_mail.sh     # "all good" mail at end of pipeline
+├── Jenkinsfile               # pipeline-as-code: jobs 1-6 as declarative stages
 ├── .gitattributes            # force LF on scripts (Linux agent)
 └── .gitignore                # only README.md is tracked among *.md
 ```
@@ -89,11 +90,40 @@ sudo systemctl restart jenkins
 ```
 
 ### 3. Required plugins
-- **Parameterized Trigger** — pass parameters and chain one job into the next
-- **Git / GitHub** — clone this repo into each job
-- **Delivery Pipeline** — visualize Job 1 → … → Job 6 as a pipeline
+- **Pipeline + Git / GitHub** — run the `Jenkinsfile` from SCM (part of suggested plugins)
+- **Timestamper** — the pipeline's `timestamps()` option (part of suggested plugins)
+- Only for the freestyle alternative (4b): **Parameterized Trigger** to chain jobs,
+  **Delivery Pipeline** to visualize Job 1 → … → Job 6
 
-### 4. Build the pipeline
+### 4. Build the pipeline — pipeline-as-code (recommended)
+
+The repo ships a declarative **`Jenkinsfile`** that runs Jobs 1→6 as stages of a single
+pipeline. Set it up once:
+
+1. **New Item → Pipeline** (name it e.g. `build-deploy-test`).
+2. **Pipeline → Definition**: *Pipeline script from SCM* → **Git** →
+   `https://github.com/www8351/build-deploy-test.git`, branch `main`,
+   script path `Jenkinsfile`.
+3. **Build with Parameters** — every job parameter is exposed with a sane default:
+
+   | Parameter | Default | Used by |
+   |-----------|---------|---------|
+   | `USER_NAME` | `tester1` | Job 1 |
+   | `HOST_PORT` | `8351` | Job 2 |
+   | `REMOTE_HOST` | *(empty — stage skipped)* | Job 4 |
+   | `REMOTE_USER` | `root` | Job 4 |
+   | `IMAGE` | `nginx` | Jobs 4/5 |
+   | `COUNT` | `3` | Job 5 |
+   | `RECIPIENT` | *(empty — stage skipped)* | Job 6 |
+   | `SUBJECT`, `BODY` | "all good" defaults | Job 6 |
+
+   Job 4 (remote pull) and Job 6 (mail) **skip automatically** when `REMOTE_HOST` /
+   `RECIPIENT` are left empty, so the pipeline runs green out-of-the-box on a single agent.
+   A *Preflight* stage wipes stale artifacts and fails fast if the agent lacks docker or
+   passwordless sudo. `Log.txt` and `zipfile.tgz` are archived on every run.
+
+### 4b. Alternative: chained freestyle jobs (the classic way)
+
 Create one freestyle job per script. In each:
 - **Source Code Management → Git**: `https://github.com/www8351/build-deploy-test.git`
 - **Build → Execute shell**: `bash jobs/jobN_*.sh`
