@@ -1,0 +1,6 @@
+[
+  {"role": "roles/owner", "members": ["user:root@example.com", "serviceAccount:ci@proj.iam.gserviceaccount.com"]},
+  {"role": "roles/editor", "members": ["user:dev@example.com"]},
+  {"role": "roles/viewer", "members": ["user:auditor@example.com"]},
+  {"role": "roles/storage.objectViewer", "members": ["group:readers@example.com"]}
+]
