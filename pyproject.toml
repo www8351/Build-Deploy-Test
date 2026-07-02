@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gcp = ["google-cloud-resourcemanager>=1.12"]  # job18 - IAM audit
+gcp = ["google-cloud-resource-manager>=1.12"]  # job18 - IAM audit
 dev = ["ruff>=0.5", "pytest>=8.0"]
 
 # uv manages the virtualenv + a reproducible uv.lock. This repo is a collection
