@@ -188,14 +188,23 @@ CI runs exactly `uv sync --all-extras --locked` in every Python job (`python`, `
 ### OpenTofu — Infrastructure as Code (`infra/`)
 Declarative twin of `job15`: a hardened EC2 instance with **IMDSv2 required**
 (`http_tokens = required`), a least-open security group and SSM-resolved Amazon Linux 2023.
-Remote state uses an S3 backend supplied at init time (kept out of VCS):
+The HCL is native OpenTofu (`required_version >= 1.6`, `hashicorp/aws` provider) — there is no
+legacy Terraform Cloud / `remote` backend to migrate; `tofu validate` passes as-is.
+
+**State + locking live on self-hosted infrastructure — no external SaaS** (no S3, no DynamoDB,
+no Terraform Cloud), per the data-sovereignty mandate. The `pg` backend keeps state in an
+internal PostgreSQL instance and locks via Postgres advisory locks. Credentials are injected at
+init time, never committed:
 
 ```bash
 cd infra
 tofu fmt -check
-tofu init -backend-config="bucket=my-tfstate" -backend-config="key=hardened-web/terraform.tfstate" \
-          -backend-config="region=us-east-1"
+# Self-hosted state backend on the isolated network (uncomment the pg backend in versions.tf):
+tofu init -backend-config="conn_str=postgres://tfstate@tf-state.internal:5432/tfstate?sslmode=require"
 tofu validate && tofu plan -var 'ssh_cidr=203.0.113.0/24'
+
+# CI validates without a backend:
+tofu -chdir=infra init -backend=false && tofu -chdir=infra validate
 ```
 
 State files and the `.terraform/` provider cache are gitignored; `.terraform.lock.hcl` is
