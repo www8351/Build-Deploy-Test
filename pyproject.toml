@@ -1,0 +1,28 @@
+[project]
+name = "devops-automation-labs"
+version = "0.1.0"
+description = "DevOps automation labs - build/deploy jobs plus a security & cloud backlog"
+requires-python = ">=3.9"
+dependencies = [
+    "aiohttp>=3.9",   # job11 - async API health monitor
+    "pydantic>=2.6",  # job11 - response schema validation
+]
+
+[project.optional-dependencies]
+gcp = ["google-cloud-resourcemanager>=1.12"]  # job18 - IAM audit
+dev = ["ruff>=0.5", "pytest>=8.0"]
+
+# uv manages the virtualenv + a reproducible uv.lock. This repo is a collection
+# of scripts, not an installable package, so disable packaging.
+#   uv sync --all-extras        # create .venv and resolve deps
+#   uv run ruff check labs jobs # lint through the managed env
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+# pyflakes(F), pycodestyle(E,W), isort(I), pyupgrade(UP), bugbear(B).
+select = ["E", "F", "W", "I", "UP", "B"]

@@ -30,14 +30,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.12'
 
-      - name: py_compile
-        run: python -m compileall -q labs jobs
+      - name: Resolve deps (uv)
+        run: uv sync --all-extras
 
-      - name: Ruff
-        run: |
-          python -m pip install --quiet ruff
-          python -m ruff check labs jobs
+      - name: Ruff (uv)
+        run: uv run ruff check labs jobs
+
+      - name: Compile (uv)
+        run: uv run python -m compileall -q labs jobs
