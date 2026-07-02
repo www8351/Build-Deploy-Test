@@ -1,0 +1,13 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "nginx",
+  "Results": [
+    {
+      "Target": "nginx (debian 12)",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2024-0001", "Severity": "HIGH", "PkgName": "libssl"},
+        {"VulnerabilityID": "CVE-2024-0002", "Severity": "CRITICAL", "PkgName": "zlib"}
+      ]
+    }
+  ]
+}

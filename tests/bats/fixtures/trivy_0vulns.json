@@ -1,0 +1,10 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "nginx",
+  "Results": [
+    {
+      "Target": "nginx (debian 12)",
+      "Vulnerabilities": []
+    }
+  ]
+}
