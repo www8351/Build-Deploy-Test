@@ -16,6 +16,30 @@ threat detection), plus **CycloneDX/SPDX SBOMs** from the CVE scan. The repo was
 > `docker`). Install scripts auto-detect `apt-get`, `dnf` or `yum`, so they run on
 > Debian/Ubuntu **and** RHEL/CentOS.
 
+## See it run
+
+![Demo: make test, then the CVE gate blocking a deploy and firewall/EC2 dry-runs](docs/demo.svg)
+
+No cloud, no root, no risk — `make demo` runs the non-destructive dry-run jobs, and
+`make test` runs the full suite:
+
+```console
+$ make test
+tests/python ..............................  [pytest]
+39 passed, 1 skipped — coverage 94% (jobs/*.py)
+✓ tests/bats  16 tests  (jobs 7/8/10/13/15)
+
+$ THRESHOLD=0 ./jobs/job8_trivy_docker_scan.sh      # CVE gate
+Found 2 HIGH,CRITICAL vulnerabilities (threshold: 0).
+✗ Vulnerability count exceeds threshold — blocking deployment.   (exit 1)
+
+$ DRY_RUN=1 ./jobs/job10_iptables_lockdown.sh        # firewall, rendered not applied
+--- DRY_RUN: iptables-restore input ---
+:INPUT DROP [0:0]
+-A INPUT -p tcp --dport 8351 -m conntrack --ctstate NEW -j ACCEPT
+✓ Done: dry run, no rules applied.
+```
+
 ## Repo layout
 
 ```
@@ -47,7 +71,7 @@ threat detection), plus **CycloneDX/SPDX SBOMs** from the CVE scan. The repo was
 ├── tests/
 │   ├── conftest.py           # importlib loader for the digit-prefixed job modules
 │   ├── python/               # pytest: jobs 9/11/18 (unit + async + offline e2e)
-│   └── bats/                 # bats-core: jobs 7/10/13/15 (dry-run / idempotency)
+│   └── bats/                 # bats-core: jobs 7/8/10/13/15 (dry-run / idempotency / gate)
 ├── pyproject.toml            # uv-managed deps + ruff + pytest/coverage config
 ├── Makefile                  # make test / lint / fmt — one-command entry point
 ├── Jenkinsfile               # pipeline-as-code: jobs 1-6 stages + opt-in security group
@@ -228,8 +252,10 @@ at **≥80%** (currently ~94%):
 idempotency / arg-guard** surfaces only — a `setup()` stub dir shadows `sudo`, `sshd`,
 `iptables-restore` and `aws`, and the "must never run" stubs fail loudly, so a test that
 reaches a real system call is caught. job7 proves `set_directive` idempotency (no duplicate
-lines on re-run); job10/13/15 assert their rendered rulesets / pipelines / plans. Shell
-coverage is measured as enumerated behaviour, not a line-percentage (no flaky `kcov` step).
+lines on re-run); job8 stubs `trivy` with canned JSON fixtures to prove the CVE gate blocks
+an over-threshold image and passes a clean one; job10/13/15 assert their rendered rulesets /
+pipelines / plans. Shell coverage is measured as enumerated behaviour, not a line-percentage
+(no flaky `kcov` step).
 
 ## Jenkins setup
 
