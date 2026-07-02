@@ -3,3 +3,8 @@
 *.py   text eol=lf
 *.bats text eol=lf
 *.bash text eol=lf
+*.tf   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.toml text eol=lf
+uv.lock text eol=lf
