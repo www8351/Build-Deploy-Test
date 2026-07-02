@@ -1,6 +1,8 @@
 # Build & Deploy & Test
 
 [![CI](https://github.com/www8351/build-deploy-test/actions/workflows/ci.yml/badge.svg)](https://github.com/www8351/build-deploy-test/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/www8351/build-deploy-test/python-coverage-comment-action-data/endpoint.json)](https://github.com/www8351/build-deploy-test/tree/python-coverage-comment-action-data)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A DevOps lab: two interactive **Labs**, six **build/deploy Jobs** (Docker) wired together as a
 Jenkins delivery pipeline, plus a **Security & Cloud backlog** (jobs 7–18) — SSH/firewall
@@ -42,9 +44,15 @@ threat detection), plus **CycloneDX/SPDX SBOMs** from the CVE scan. The repo was
 │   └── terraform.tfvars.example
 ├── k8s/cilium/               # Cilium eBPF NetworkPolicies (default-deny + allow-web)
 ├── falco/                    # Falco runtime threat-detection rules
-├── pyproject.toml            # uv-managed deps + ruff config (python jobs)
+├── tests/
+│   ├── conftest.py           # importlib loader for the digit-prefixed job modules
+│   ├── python/               # pytest: jobs 9/11/18 (unit + async + offline e2e)
+│   └── bats/                 # bats-core: jobs 7/10/13/15 (dry-run / idempotency)
+├── pyproject.toml            # uv-managed deps + ruff + pytest/coverage config
+├── Makefile                  # make test / lint / fmt — one-command entry point
 ├── Jenkinsfile               # pipeline-as-code: jobs 1-6 stages + opt-in security group
-├── .github/workflows/ci.yml  # CI: shellcheck + bash -n; uv sync + ruff + compile
+├── .github/workflows/ci.yml  # CI: lint + pytest matrix + coverage + bats + tofu validate
+├── LICENSE                   # MIT
 ├── .gitattributes            # force LF on scripts (Linux agent)
 └── .gitignore                # only README.md is tracked among *.md
 ```
@@ -125,6 +133,9 @@ ones, structured (JSON / Markdown) output, and a **non-zero exit that gates a pi
 > job 7 validates and **auto-rolls-back**. Cloud jobs 15/18 need real credentials
 > (AWS creds / GCP ADC). Read each script's header block before running for real.
 
+> Job numbers follow the original backlog; the gaps (12, 14, 16, 17) are backlog items
+> not implemented here — the numbering is intentional, not missing work.
+
 ## 2026 toolchain & IaC
 
 Modern open-source tooling layered on top of the jobs. Each was validated locally through its
@@ -186,6 +197,39 @@ for an image that fails the scan:
 SBOM_FORMAT=cyclonedx  ./jobs/job8_trivy_docker_scan.sh   # -> sbom.cdx.json
 SBOM_FORMAT=spdx-json  ./jobs/job8_trivy_docker_scan.sh
 ```
+
+## Testing
+
+The suite is a real CI gate, not decoration — pushes and PRs must pass it. One command runs
+everything:
+
+```bash
+make test          # pytest (Python jobs) + bats (shell jobs)
+make test-py       # Python only, with the coverage gate
+make test-bats     # shell only
+make lint          # ruff + shellcheck + bash -n
+```
+
+**Python (`tests/python/`, pytest).** The digit-prefixed job modules are loaded by file path
+via an `importlib` helper in `tests/conftest.py`. Coverage is scoped to `jobs/*.py` and gated
+at **≥80%** (currently ~94%):
+
+- **job9 (FIM)** — `sha256_file` vs a hashlib reference (incl. the >64 KiB chunk loop),
+  `build_baseline` row-count + DELETE/insert idempotency, and the money path: `verify` returns
+  0 clean / 1 on a real add·remove·modify (mutated mid-test, so the drift check can't pass
+  vacuously) / raises on a missing or empty baseline.
+- **job11 (health monitor)** — pure `percentile`/`summarize` edge cases, plus `probe_once`
+  driven against a **loopback aiohttp test server** (200-JSON / non-JSON / array / 500 /
+  timeout) — no real network, so it never flakes.
+- **job18 (GCP IAM)** — `analyze`/`to_markdown` plus an offline end-to-end run through
+  `--bindings-file` asserting exit 1 on violations, 0 when clean.
+
+**Shell (`tests/bats/`, bats-core).** Ops scripts are exercised through their **dry-run /
+idempotency / arg-guard** surfaces only — a `setup()` stub dir shadows `sudo`, `sshd`,
+`iptables-restore` and `aws`, and the "must never run" stubs fail loudly, so a test that
+reaches a real system call is caught. job7 proves `set_directive` idempotency (no duplicate
+lines on re-run); job10/13/15 assert their rendered rulesets / pipelines / plans. Shell
+coverage is measured as enumerated behaviour, not a line-percentage (no flaky `kcov` step).
 
 ## Jenkins setup
 
