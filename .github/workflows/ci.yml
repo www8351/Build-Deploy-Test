@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'   # weekly full-history secret sweep (Mon 06:00 UTC)
+  workflow_dispatch: {}
 
 jobs:
   shell:
@@ -114,3 +117,35 @@ jobs:
         run: |
           tofu -chdir=infra init -backend=false
           tofu -chdir=infra validate
+
+  security:
+    name: Security scan (self)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read          # gitleaks reads the working tree + git history
+      pull-requests: write    # gitleaks posts its leak-summary comment on PRs
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0       # gitleaks needs the whole history on schedule/dispatch
+
+      # Secret detection. On push/PR gitleaks scans the event's commits; the weekly
+      # schedule + manual dispatch scan the entire history (see the `on:` block).
+      - name: gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}   # public repo: no GITLEAKS_LICENSE needed
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+
+      - name: Resolve deps (uv)
+        run: uv sync --all-extras
+
+      # Python SAST — flake8-bandit S rules. This is the same ruleset the project
+      # lints with; here it runs as an explicit, standalone security gate.
+      - name: Ruff security lint (flake8-bandit "S")
+        run: uv run ruff check --select S labs jobs tests

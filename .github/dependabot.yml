@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Python runtime deps (aiohttp, pydantic, google-cloud-resource-manager) + dev
+  # tools — surfaces CVEs and version bumps as PRs. Complements the CI SAST gate
+  # with software-composition (dependency) coverage.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+
+  # Pinned GitHub Actions — keeps checkout/setup-uv/gitleaks/etc. current so a
+  # stale pin doesn't miss a security fix (the token-adjacent security job most).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci(deps)
