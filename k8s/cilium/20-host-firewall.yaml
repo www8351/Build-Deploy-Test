@@ -58,6 +58,8 @@ spec:
         - ports:
             - port: "53"
               protocol: UDP
+            - port: "53"
+              protocol: TCP     # TCP/53 too: large/DNSSEC answers fall back to TCP
           rules:
             dns:
               - matchPattern: "*"
