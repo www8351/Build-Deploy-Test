@@ -1,0 +1,51 @@
+# Falco runtime threat-detection rules (self-contained: defines its own macros
+# and lists so `falco --validate` passes standalone). Host + container coverage
+# complementing the file-integrity monitor (job9) at runtime.
+#
+# Validate: falco --validate falco/falco_rules.local.yaml
+# Deploy:   mount at /etc/falco/rules.d/ or pass with -r
+---
+- macro: in_container
+  condition: container.id != host
+
+- list: fim_sensitive_files
+  items:
+    - /etc/shadow
+    - /etc/sudoers
+    - /root/.ssh/authorized_keys
+
+- list: shell_binaries
+  items: [bash, sh, zsh, dash, ash, ksh]
+
+- rule: Sensitive file read
+  desc: A sensitive credential/config file was opened for reading.
+  condition: >
+    evt.type in (open, openat) and evt.dir = < and
+    fd.name in (fim_sensitive_files)
+  output: >
+    Sensitive file read (file=%fd.name proc=%proc.cmdline
+    user=%user.name container=%container.name)
+  priority: WARNING
+  tags: [filesystem, mitre_credential_access]
+
+- rule: Shell spawned in container
+  desc: An interactive shell started inside a container (possible exec/breakout).
+  condition: >
+    evt.type in (execve, execveat) and evt.dir = < and
+    in_container and proc.name in (shell_binaries)
+  output: >
+    Shell in container (proc=%proc.cmdline parent=%proc.pname
+    container=%container.name image=%container.image.repository)
+  priority: NOTICE
+  tags: [container, shell, mitre_execution]
+
+- rule: Write below etc
+  desc: A process wrote to a file under /etc outside package management.
+  condition: >
+    evt.type in (open, openat, creat) and evt.dir = < and
+    evt.is_open_write = true and fd.name startswith /etc/
+  output: >
+    Write under /etc (file=%fd.name proc=%proc.cmdline
+    user=%user.name container=%container.name)
+  priority: WARNING
+  tags: [filesystem, mitre_persistence]

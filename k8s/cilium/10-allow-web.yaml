@@ -1,0 +1,32 @@
+# Cilium eBPF network policy - allow just what the web app needs.
+# Ingress: TCP 8351 from outside the cluster (world). Egress: DNS to kube-dns
+# (with L7 DNS visibility) so name resolution works under default-deny.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-web
+  namespace: web
+spec:
+  endpointSelector:
+    matchLabels:
+      app: web
+  ingress:
+    - fromEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "8351"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*"

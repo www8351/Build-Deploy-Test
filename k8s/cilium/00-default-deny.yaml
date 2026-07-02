@@ -1,0 +1,17 @@
+# Cilium eBPF network policy - default deny for the `web` namespace.
+# The k8s/eBPF twin of jobs/job10_iptables_lockdown.sh: once this selects an
+# endpoint, Cilium switches it to default-deny for both directions; the
+# companion 10-allow-web.yaml then re-opens exactly what is needed.
+#
+# Apply:  kubectl apply -f k8s/cilium/    (cluster must run Cilium as CNI)
+# Verify: cilium policy get ; kubectl -n web get ciliumnetworkpolicy
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: web
+spec:
+  endpointSelector: {}   # every endpoint in the namespace
+  ingress: []            # empty rule set = deny all ingress
+  egress: []             # empty rule set = deny all egress
