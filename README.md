@@ -5,8 +5,10 @@
 A DevOps lab: two interactive **Labs**, six **build/deploy Jobs** (Docker) wired together as a
 Jenkins delivery pipeline, plus a **Security & Cloud backlog** (jobs 7–18) — SSH/firewall
 hardening, CVE + file-integrity scanning, encrypted backups, async health monitoring, and
-AWS/GCP provisioning & IAM audit. The repo was built **one commit per step** so the git
-history reads as a step-by-step walkthrough.
+AWS/GCP provisioning & IAM audit. It also ships a **2026 open-source toolchain**: `uv`
+(Python deps), **OpenTofu** (IaC), **Cilium** (eBPF NetworkPolicies) and **Falco** (runtime
+threat detection), plus **CycloneDX/SPDX SBOMs** from the CVE scan. The repo was built
+**one commit per step** so the git history reads as a step-by-step walkthrough.
 
 > Scripts target a **Linux Jenkins agent** (they use `useradd`, a package manager and
 > `docker`). Install scripts auto-detect `apt-get`, `dnf` or `yum`, so they run on
@@ -35,7 +37,14 @@ history reads as a step-by-step walkthrough.
 │   ├── job13_pg_dump_encrypt.sh   # pg_dump | zstd | gpg streamed encrypted backup
 │   ├── job15_aws_ec2_provision.sh # AWS EC2 provision, IMDSv2-required, least-open SG
 │   └── job18_gcp_iam_least_priv.py# GCP IAM audit: flag owner/editor, Markdown report
+├── infra/                    # OpenTofu IaC: hardened EC2 (IMDSv2) + least-open SG
+│   ├── main.tf variables.tf outputs.tf versions.tf   # + S3 remote-state backend
+│   └── terraform.tfvars.example
+├── k8s/cilium/               # Cilium eBPF NetworkPolicies (default-deny + allow-web)
+├── falco/                    # Falco runtime threat-detection rules
+├── pyproject.toml            # uv-managed deps + ruff config (python jobs)
 ├── Jenkinsfile               # pipeline-as-code: jobs 1-6 stages + opt-in security group
+├── .github/workflows/ci.yml  # CI: shellcheck + bash -n; uv sync + ruff + compile
 ├── .gitattributes            # force LF on scripts (Linux agent)
 └── .gitignore                # only README.md is tracked among *.md
 ```
@@ -116,6 +125,68 @@ ones, structured (JSON / Markdown) output, and a **non-zero exit that gates a pi
 > job 7 validates and **auto-rolls-back**. Cloud jobs 15/18 need real credentials
 > (AWS creds / GCP ADC). Read each script's header block before running for real.
 
+## 2026 toolchain & IaC
+
+Modern open-source tooling layered on top of the jobs. Each was validated locally through its
+official container (`ghcr.io/opentofu/opentofu`, `falcosecurity/falco`, `aquasec/trivy`).
+
+### `uv` — Python environment & dependencies
+`pyproject.toml` declares the Python jobs' deps (`aiohttp`, `pydantic`, optional `gcp` extra
+for `google-cloud-resource-manager`) and the `ruff` lint config. CI resolves and lints through
+`uv`:
+
+```bash
+uv sync --all-extras        # create .venv and resolve deps
+uv run ruff check labs jobs
+uv run python jobs/job11_api_health_monitor.py --url https://example.com --count 20
+```
+
+### OpenTofu — Infrastructure as Code (`infra/`)
+Declarative twin of `job15`: a hardened EC2 instance with **IMDSv2 required**
+(`http_tokens = required`), a least-open security group and SSM-resolved Amazon Linux 2023.
+Remote state uses an S3 backend supplied at init time (kept out of VCS):
+
+```bash
+cd infra
+tofu fmt -check
+tofu init -backend-config="bucket=my-tfstate" -backend-config="key=hardened-web/terraform.tfstate" \
+          -backend-config="region=us-east-1"
+tofu validate && tofu plan -var 'ssh_cidr=203.0.113.0/24'
+```
+
+State files and the `.terraform/` provider cache are gitignored; `.terraform.lock.hcl` is
+committed for reproducible provider versions.
+
+### Cilium — eBPF network policy (`k8s/cilium/`)
+The k8s/eBPF layer-3/4 twin of `job10`'s firewall. `00-default-deny.yaml` flips the `web`
+namespace to default-deny; `10-allow-web.yaml` re-opens only TCP `8351` from `world` and DNS
+egress (with L7 DNS visibility). Apply on a Cilium-CNI cluster:
+
+```bash
+kubectl apply -f k8s/cilium/
+kubectl -n web get ciliumnetworkpolicy
+```
+
+### Falco — runtime threat detection (`falco/`)
+`falco_rules.local.yaml` adds self-contained rules — sensitive-file reads
+(`/etc/shadow`, authorized_keys), a shell spawned inside a container, and writes under `/etc`
+— complementing the `job9` file-integrity baseline at runtime:
+
+```bash
+falco --validate falco/falco_rules.local.yaml     # rules are syntax-checked in CI-style
+falco -r falco/falco_rules.local.yaml             # run against the live host/containers
+```
+
+### SBOM (Job 8)
+`job8` emits a Software Bill of Materials next to the CVE report — **CycloneDX** by default,
+**SPDX** on request — generated *before* the vulnerability gate so it exists as evidence even
+for an image that fails the scan:
+
+```bash
+SBOM_FORMAT=cyclonedx  ./jobs/job8_trivy_docker_scan.sh   # -> sbom.cdx.json
+SBOM_FORMAT=spdx-json  ./jobs/job8_trivy_docker_scan.sh
+```
+
 ## Jenkins setup
 
 ### 1. Install Jenkins
@@ -188,5 +259,10 @@ the CLI `mail` fallback.
 ## Notes
 - `.gitignore` keeps the repo clean: every `*.md` is ignored except this `README.md`. Local
   lifecycle files (`STATUS.md`, `PROGRESS.md`, `DECISIONS.md`, `CLAUDE_MEMORY.md`) live on
-  disk but are never pushed.
+  disk but are never pushed. It also ignores `.venv/`, `uv.lock`, `infra/.terraform/`,
+  `*.tfstate*`, `terraform.tfvars`, and job runtime artifacts (`trivy_report.json`,
+  `sbom.cdx.json`, `fim_baseline.db`, `iam_audit.md`).
 - `.gitattributes` forces LF endings on `*.sh`/`*.py` so the Linux agent never chokes on CRLF.
+- **CI** (`.github/workflows/ci.yml`): a *Shell lint* job (`bash -n` + ShellCheck over
+  `labs/`+`jobs/`) and a *Python lint* job (`uv sync` → `ruff` → `compileall`). Docs-only per-
+  directory notes live in each file's header comment, since every non-README `*.md` is ignored.
