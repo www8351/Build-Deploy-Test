@@ -257,6 +257,18 @@ an over-threshold image and passes a clean one; job10/13/15 assert their rendere
 pipelines / plans. Shell coverage is measured as enumerated behaviour, not a line-percentage
 (no flaky `kcov` step).
 
+## Security
+
+A security repo should scan itself. CI has a dedicated **`security`** job:
+
+- **gitleaks** — secret detection on every push/PR, plus a weekly full-history sweep.
+- **ruff `flake8-bandit` (`S`)** — Python SAST gate (pinned ruff for determinism).
+- **Dependabot** — `pip` + `github-actions` CVE/version PRs.
+
+Policy, scope, threat model and disclosure: **[SECURITY.md](SECURITY.md)**. It is deliberately
+honest about what the lab does *not* protect against (permissive network defaults, no IaC
+misconfig scan yet, single-trusted-operator model).
+
 ## Jenkins setup
 
 ### 1. Install Jenkins
