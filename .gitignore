@@ -7,9 +7,9 @@
 __pycache__/
 *.pyc
 
-# python env (uv)
+# python env (uv). uv.lock IS committed — it pins the exact dependency graph so
+# CI/dev builds are deterministic (`uv sync --locked`).
 .venv/
-uv.lock
 
 # test / coverage artifacts
 .coverage

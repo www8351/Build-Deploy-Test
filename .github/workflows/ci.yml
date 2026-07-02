@@ -39,7 +39,7 @@ jobs:
           python-version: '3.12'
 
       - name: Resolve deps (uv)
-        run: uv sync --all-extras
+        run: uv sync --all-extras --locked
 
       - name: Ruff (uv)
         run: uv run ruff check labs jobs tests
@@ -66,7 +66,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Resolve deps (uv)
-        run: uv sync --all-extras
+        run: uv sync --all-extras --locked
 
       - name: pytest + coverage (jobs/*.py)
         run: |
@@ -143,7 +143,7 @@ jobs:
           python-version: '3.12'
 
       - name: Resolve deps (uv)
-        run: uv sync --all-extras
+        run: uv sync --all-extras --locked
 
       # Python SAST — flake8-bandit S rules. This is the same ruleset the project
       # lints with; here it runs as an explicit, standalone security gate.

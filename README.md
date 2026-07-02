@@ -167,14 +167,23 @@ official container (`ghcr.io/opentofu/opentofu`, `falcosecurity/falco`, `aquasec
 
 ### `uv` — Python environment & dependencies
 `pyproject.toml` declares the Python jobs' deps (`aiohttp`, `pydantic`, optional `gcp` extra
-for `google-cloud-resource-manager`) and the `ruff` lint config. CI resolves and lints through
-`uv`:
+for `google-cloud-resource-manager`) and the `ruff` lint config. **`uv` is the only Python
+workflow — no `pip install` / `python -m venv`.** The resolved graph is pinned in a committed
+`uv.lock` (68 packages), so every dev box and CI runner builds the *exact* same environment.
 
 ```bash
-uv sync --all-extras        # create .venv and resolve deps
-uv run ruff check labs jobs
-uv run python jobs/job11_api_health_monitor.py --url https://example.com --count 20
+# Local: create .venv from the lockfile (fails if lock is stale — deterministic)
+uv sync --all-extras --locked
+uv run ruff check labs jobs tests
+uv run pytest tests/python
+
+# After changing deps in pyproject.toml: refresh + commit the lock
+uv lock            # regenerate uv.lock
+uv lock --check    # CI-style assert the lock matches pyproject
 ```
+
+CI runs exactly `uv sync --all-extras --locked` in every Python job (`python`, `python-test`,
+`security`) — a drifted or missing lock fails the build rather than silently resolving fresh.
 
 ### OpenTofu — Infrastructure as Code (`infra/`)
 Declarative twin of `job15`: a hardened EC2 instance with **IMDSv2 required**
