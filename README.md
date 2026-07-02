@@ -1,5 +1,7 @@
 # Build & Deploy & Test
 
+[![CI](https://github.com/www8351/build-deploy-test/actions/workflows/ci.yml/badge.svg)](https://github.com/www8351/build-deploy-test/actions/workflows/ci.yml)
+
 A small DevOps lab: two interactive **Labs** and six **Jenkins Jobs** that build, deploy and
 test with Docker — wired together as a Jenkins delivery pipeline. The repo was built **one
 commit per step** so the git history reads as a step-by-step walkthrough.
