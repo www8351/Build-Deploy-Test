@@ -133,7 +133,7 @@ jobs:
       # Secret detection. On push/PR gitleaks scans the event's commits; the weekly
       # schedule + manual dispatch scan the entire history (see the `on:` block).
       - name: gitleaks (secret scan)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ github.token }}   # public repo: no GITLEAKS_LICENSE needed
 
