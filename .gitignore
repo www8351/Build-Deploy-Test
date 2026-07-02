@@ -5,3 +5,19 @@
 # python build artifacts
 __pycache__/
 *.pyc
+
+# python env (uv)
+.venv/
+uv.lock
+
+# OpenTofu / Terraform (keep .tf and .terraform.lock.hcl; ignore state + provider cache)
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+
+# job runtime artifacts
+trivy_report.json
+sbom.cdx.json
+fim_baseline.db
+iam_audit.md
