@@ -4,8 +4,8 @@
 
 ### `2 labs` · `6 pipeline jobs` · `12-job security & cloud backlog` · `2026 toolchain`
 
-**A DevOps lab that grows from interactive menus to a Jenkins delivery pipeline — hardening, CVE gates, IaC and runtime threat detection, built one commit per step.**
-*מעבדת DevOps שצומחת מתפריטים אינטראקטיביים לפייפליין אספקה ב-Jenkins — הקשחה, שערי CVE, תשתית-כקוד וזיהוי איומים בזמן ריצה, בנויה קומיט-אחד-לכל-שלב.*
+**A DevOps lab that grows from interactive menus to a Jenkins delivery pipeline hardening, CVE gates, IaC and runtime threat detection, built one commit per step.**
+*מעבדת DevOps שצומחת מתפריטים אינטראקטיביים לפייפליין אספקה ב-Jenkins הקשחה, שערי CVE, תשתית-כקוד וזיהוי איומים בזמן ריצה, בנויה קומיט-אחד-לכל-שלב.*
 
 <br/>
 
@@ -50,7 +50,7 @@ history reads as a step-by-step walkthrough.
 ### 🇮🇱 עברית
 
 מעבדת DevOps: שני **Labs** אינטראקטיביים, שישה **Jobs** של build/deploy (Docker) המחוברים
-כפייפליין אספקה ב-Jenkins, ובנוסף **בק‏לוג אבטחה וענן** (jobs 7–18) — הקשחת SSH/פיירוול,
+כפייפליין אספקה ב-Jenkins, ובנוסף **בק‏לוג אבטחה וענן** (jobs 7–18) הקשחת SSH/פיירוול,
 סריקת CVE ושלמות-קבצים, גיבויים מוצפנים, ניטור בריאות אסינכרוני, והקמת AWS/GCP + ביקורת IAM.
 
 הפרויקט מגיע עם **טולצ'יין קוד-פתוח 2026**: `uv` (תלויות פייתון), **OpenTofu** (תשתית-כקוד),
@@ -72,7 +72,7 @@ history reads as a step-by-step walkthrough.
 
 ![Demo: make test, then the CVE gate blocking a deploy and firewall/EC2 dry-runs](docs/demo.svg)
 
-No cloud, no root, no risk — `make demo` runs the non-destructive dry-run jobs, `make test`
+No cloud, no root, no risk `make demo` runs the non-destructive dry-run jobs, `make test`
 runs the full suite:
 
 ```console
@@ -82,7 +82,7 @@ $ make test
 
 $ THRESHOLD=0 ./jobs/job8_trivy_docker_scan.sh      # CVE gate
 Found 2 HIGH,CRITICAL vulnerabilities (threshold: 0).
-✗ Vulnerability count exceeds threshold — blocking deployment.   (exit 1)
+✗ Vulnerability count exceeds threshold blocking deployment.   (exit 1)
 
 $ DRY_RUN=1 ./jobs/job10_iptables_lockdown.sh        # firewall, rendered not applied
 :INPUT DROP [0:0]
@@ -133,7 +133,7 @@ are empty, so the pipeline runs green on a single agent.
 ---
 
 <details>
-<summary><b>🛡️ Security & Cloud jobs (7–18)</b> — hardening, scanning, provisioning</summary>
+<summary><b>🛡️ Security & Cloud jobs (7–18)</b> hardening, scanning, provisioning</summary>
 
 <br/>
 
@@ -154,7 +154,7 @@ structured (JSON/Markdown) output, and a **non-zero exit that gates a pipeline**
 
 > ⚠️ Jobs 7 & 10 change system state. Job 10 defaults to **dry-run**; job 7 validates and
 > **auto-rolls-back**. Cloud jobs 15/18 need real credentials. Gaps (12/14/16/17) are backlog
-> items — the numbering is intentional, not missing work.
+> items the numbering is intentional, not missing work.
 
 </details>
 
@@ -167,14 +167,14 @@ Each was validated locally through its official container (`ghcr.io/opentofu/ope
 `falcosecurity/falco`, `aquasec/trivy`).
 
 - **`uv`** — the *only* Python workflow (no `pip` / `venv`). Deps pinned in a committed
-  `uv.lock` (68 packages); CI runs `uv sync --all-extras --locked` — a drifted lock fails the build.
+  `uv.lock` (68 packages); CI runs `uv sync --all-extras --locked` a drifted lock fails the build.
 - **OpenTofu (`infra/`)** — declarative twin of `job15`: hardened EC2, **IMDSv2 required**,
   least-open SG, SSM-resolved AL2023. State on a self-hosted **`pg` backend** (no S3 / no TF Cloud).
 - **Cilium (`k8s/cilium/`)** — eBPF twin of `job10`: default-deny `web` namespace, re-open only
   TCP 8351 + DNS, plus a **clusterwide Host Firewall** (audit-mode stageable).
-- **Falco (`falco/`)** — runtime rules (sensitive-file reads, container shells, `/etc` writes)
+- **Falco (`falco/`)** runtime rules (sensitive-file reads, container shells, `/etc` writes)
   on the `modern_ebpf` CO-RE driver; **all external outputs disabled** (data sovereignty).
-- **SBOM (Job 8)** — CycloneDX by default / SPDX on request, generated *before* the CVE gate so
+- **SBOM (Job 8)** CycloneDX by default / SPDX on request, generated *before* the CVE gate so
   it exists as evidence even for a failing image.
 
 ```bash
@@ -187,7 +187,7 @@ SBOM_FORMAT=cyclonedx ./jobs/job8_trivy_docker_scan.sh   # -> sbom.cdx.json
 </details>
 
 <details>
-<summary><b>🧪 Testing</b> — a real CI gate, not decoration</summary>
+<summary><b>🧪 Testing</b> a real CI gate, not decoration</summary>
 
 <br/>
 
@@ -198,16 +198,16 @@ make test-bats     # shell only
 make lint          # ruff + shellcheck + bash -n
 ```
 
-- **Python (pytest)** — digit-prefixed job modules loaded via `importlib` in `conftest.py`.
+- **Python (pytest)** digit-prefixed job modules loaded via `importlib` in `conftest.py`.
   job9 FIM (hash + drift 0/1/raise), job11 health monitor (loopback aiohttp test server, no
   real network), job18 IAM (offline `--bindings-file` e2e).
-- **Shell (bats-core)** — dry-run / idempotency / arg-guard only; a `setup()` stub dir shadows
+- **Shell (bats-core)** dry-run / idempotency / arg-guard only; a `setup()` stub dir shadows
   `sudo`/`sshd`/`iptables-restore`/`aws` and "must never run" stubs fail loudly.
 
 </details>
 
 <details>
-<summary><b>🔧 Jenkins setup</b> — pipeline-as-code (recommended)</summary>
+<summary><b>🔧 Jenkins setup</b> pipeline-as-code (recommended)</summary>
 
 <br/>
 
@@ -215,7 +215,7 @@ make lint          # ruff + shellcheck + bash -n
 2. Let the `jenkins` user run job commands (`visudo` NOPASSWD for lab scope; `usermod -aG docker jenkins`).
 3. **New Item → Pipeline** → *Pipeline script from SCM* → Git
    `https://github.com/www8351/build-deploy-test.git`, branch `main`, script path `Jenkinsfile`.
-4. **Build with Parameters** — every job param exposed with a sane default (`USER_NAME=tester1`,
+4. **Build with Parameters** every job param exposed with a sane default (`USER_NAME=tester1`,
    `HOST_PORT=8351`, `IMAGE=nginx`, `COUNT=3`, …). Security jobs 7–18 wired as an **opt-in
    `Security & Compliance` stage group, all default-skipped**; destructive ones guarded default-false.
 
@@ -229,9 +229,9 @@ sudo. `Log.txt` / `zipfile.tgz` archived every run. A freestyle-jobs alternative
 
 <br/>
 
-A security repo should scan itself — CI has a dedicated **`security`** job: **gitleaks** (secret
+A security repo should scan itself CI has a dedicated **`security`** job: **gitleaks** (secret
 detection + weekly full-history sweep), **ruff `flake8-bandit`** (Python SAST), **Dependabot**
-(`pip` + `github-actions`). Policy & threat model: **[SECURITY.md](SECURITY.md)** — honest about
+(`pip` + `github-actions`). Policy & threat model: **[SECURITY.md](SECURITY.md)** honest about
 what the lab does *not* protect against.
 
 `.gitignore` keeps the repo clean (every `*.md` ignored except this README; local lifecycle files
