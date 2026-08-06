@@ -11,7 +11,7 @@ dependencies = [
 [project.optional-dependencies]
 gcp = ["google-cloud-resource-manager>=1.12"]  # job18 - IAM audit
 dev = [
-    "ruff==0.15.20",         # pinned: ruff defines which S (bandit) rules fire — the
+    "ruff==0.16.1",         # pinned: ruff defines which S (bandit) rules fire — the
                              # security gate must be deterministic (uv.lock is gitignored)
     "pytest>=8.0",
     "pytest-cov>=5.0",       # coverage of jobs/*.py
