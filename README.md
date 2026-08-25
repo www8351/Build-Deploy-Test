@@ -2,7 +2,7 @@
 
 # ⚙️ Build · Deploy · Test
 
-### `2 labs` · `6 pipeline jobs` · `12-job security & cloud backlog` · `2026 toolchain`
+### `2 labs` · `6 pipeline jobs` · `8 security & cloud jobs` · `2026 toolchain`
 
 **A DevOps lab that grows from interactive menus to a Jenkins delivery pipeline hardening, CVE gates, IaC and runtime threat detection, built one commit per step.**
 *מעבדת DevOps שצומחת מתפריטים אינטראקטיביים לפייפליין אספקה ב-Jenkins הקשחה, שערי CVE, תשתית-כקוד וזיהוי איומים בזמן ריצה, בנויה קומיט-אחד-לכל-שלב.*
@@ -33,7 +33,7 @@
 ### 🇬🇧 English
 
 A DevOps lab: two interactive **Labs**, six **build/deploy Jobs** (Docker) wired as a
-Jenkins delivery pipeline, plus a **Security & Cloud backlog** (jobs 7–18) — SSH/firewall
+Jenkins delivery pipeline, plus **8 standalone Security & Cloud jobs** (numbered 7–18, with gaps) — SSH/firewall
 hardening, CVE + file-integrity scanning, encrypted backups, async health monitoring, and
 AWS/GCP provisioning & IAM audit.
 
@@ -50,7 +50,7 @@ history reads as a step-by-step walkthrough.
 ### 🇮🇱 עברית
 
 מעבדת DevOps: שני **Labs** אינטראקטיביים, שישה **Jobs** של build/deploy (Docker) המחוברים
-כפייפליין אספקה ב-Jenkins, ובנוסף **בק‏לוג אבטחה וענן** (jobs 7–18) הקשחת SSH/פיירוול,
+כפייפליין אספקה ב-Jenkins, ובנוסף **שמונה Jobs עצמאיים של אבטחה וענן** (ממוספרים 7–18, עם פערים) הקשחת SSH/פיירוול,
 סריקת CVE ושלמות-קבצים, גיבויים מוצפנים, ניטור בריאות אסינכרוני, והקמת AWS/GCP + ביקורת IAM.
 
 הפרויקט מגיע עם **טולצ'יין קוד-פתוח 2026**: `uv` (תלויות פייתון), **OpenTofu** (תשתית-כקוד),
@@ -77,7 +77,7 @@ runs the full suite:
 
 ```console
 $ make test
-39 passed, 1 skipped — coverage 94% (jobs/*.py)
+40 passed — coverage 93% (jobs/*.py)
 ✓ tests/bats  16 tests  (jobs 7/8/10/13/15)
 
 $ THRESHOLD=0 ./jobs/job8_trivy_docker_scan.sh      # CVE gate
@@ -133,7 +133,7 @@ are empty, so the pipeline runs green on a single agent.
 ---
 
 <details>
-<summary><b>🛡️ Security & Cloud jobs (7–18)</b> hardening, scanning, provisioning</summary>
+<summary><b>🛡️ Security & Cloud jobs (8 shipped, numbered 7–18)</b> hardening, scanning, provisioning</summary>
 
 <br/>
 
@@ -193,7 +193,7 @@ SBOM_FORMAT=cyclonedx ./jobs/job8_trivy_docker_scan.sh   # -> sbom.cdx.json
 
 ```bash
 make test          # pytest (Python jobs) + bats (shell jobs)
-make test-py       # Python only, with the coverage gate (≥80%, currently ~94%)
+make test-py       # Python only, with the coverage gate (≥80%, currently 93%)
 make test-bats     # shell only
 make lint          # ruff + shellcheck + bash -n
 ```
